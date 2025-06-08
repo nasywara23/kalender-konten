@@ -5,24 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kalender Konten</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- UPDATED: Changed font from Inter to Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* NEW: Invisible scrollbar for body on mobile/md */
+        /* UPDATED: Changed font-family to Poppins */
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
         body::-webkit-scrollbar {
             display: none;
         }
         body {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        html.is-dragging {
+            overscroll-behavior-y: contain;
         }
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, minmax(0, 1fr));
         }
         .calendar-day {
-            /* min-height removed to be dynamic */
             transition: background-color 0.2s;
+            padding-bottom: 1rem; 
         }
         .kanban-card {
             cursor: grab;
@@ -30,7 +39,6 @@
             position: relative; 
             padding-bottom: 2rem; 
         }
-        /* Style untuk kartu di kalender (lebih kecil) */
         .calendar-day .kanban-card {
             font-size: 0.75rem;
             padding: 0.5rem;
@@ -46,8 +54,6 @@
             border-top: 1px solid #f1f5f9;
             padding-top: 0.5rem;
         }
-
-        /* Style untuk kartu di bank ide (lebih besar) */
         #idea-bank .kanban-card {
             font-size: 0.875rem;
             padding: 0.75rem;
@@ -56,7 +62,6 @@
             display: block; 
             font-size: 0.8rem;
         }
-      
         .kanban-card:active {
             cursor: grabbing;
         }
@@ -103,27 +108,35 @@
 </head>
 <body class="bg-slate-100 text-slate-800 lg:overflow-hidden">
 
-    <div class="flex flex-col min-h-screen lg:h-screen">
+    <!-- Mobile view message -->
+    <div class="lg:hidden flex flex-col items-center justify-center h-screen text-center p-6">
+        <i class="fas fa-mobile-alt fa-3x text-slate-400 mb-4"></i>
+        <h2 class="text-xl font-bold text-slate-800 mb-2">Halaman Ini Membutuhkan Layar Lebih Besar</h2>
+        <p class="text-slate-600">Halaman ini belum bisa diakses melalui mobile phone, gunakan tablet, laptop, atau komputer anda.</p>
+    </div>
+
+    <!-- Main application container, hidden on mobile -->
+    <div class="hidden lg:flex flex-col h-screen">
         <!-- Header -->
         <header class="p-4 border-b border-slate-200 bg-white z-10">
             <h1 class="text-xl sm:text-2xl font-bold text-slate-900">Kalender Konten</h1>
             <p class="text-sm sm:text-base text-slate-500">Drag & drop ide. Jadwal tersimpan otomatis di browser Anda.</p>
         </header>
 
-        <div class="flex-grow flex flex-col lg:flex-row p-4 gap-6 lg:overflow-hidden">
+        <div class="flex-grow flex flex-row p-4 gap-6 overflow-hidden">
             <!-- Kolom Bank Ide -->
-            <aside class="w-full lg:w-1/3 xl:w-1/4 flex flex-col bg-white p-4 rounded-xl border border-slate-200 shadow-sm lg:overflow-hidden">
+            <aside class="w-1/3 xl:w-1/4 flex flex-col bg-white p-4 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="flex-shrink-0">
                     <h2 class="text-xl font-bold text-slate-800">Bank Ide</h2>
                     <div class="grid grid-cols-2 gap-4 my-4">
                         <div>
-                            <label for="product-filter" class="text-xs sm:text-sm font-medium text-slate-600 block mb-1">Produk</label>
+                            <label for="product-filter" class="text-sm font-medium text-slate-600 block mb-1">Produk</label>
                             <select id="product-filter" class="w-full p-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition text-sm">
                                 <option value="all" selected>Semua</option>
                             </select>
                         </div>
                         <div>
-                            <label for="type-filter" class="text-xs sm:text-sm font-medium text-slate-600 block mb-1">Jenis</label>
+                            <label for="type-filter" class="text-sm font-medium text-slate-600 block mb-1">Jenis</label>
                              <select id="type-filter" class="w-full p-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition text-sm">
                                 <option value="all" selected>Semua</option>
                                 <option value="Reels">Reels</option>
@@ -133,21 +146,21 @@
                         </div>
                     </div>
                 </div>
-                <div id="idea-bank" class="scroll-container flex-grow overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-1 gap-4 pr-2">
+                <div id="idea-bank" class="scroll-container flex-grow overflow-y-auto grid grid-cols-1 gap-4 pr-2">
                     <!-- Kartu ide akan di-generate oleh JavaScript -->
                 </div>
             </aside>
 
             <!-- Kalender -->
-            <main class="w-full lg:w-2/3 xl:w-3/4 flex flex-col lg:overflow-hidden">
+            <main class="w-2/3 xl:w-3/4 flex flex-col overflow-hidden">
                  <div class="flex-shrink-0 flex justify-between items-center mb-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
                     <button id="prev-month" class="p-2 rounded-lg hover:bg-slate-200 transition"><i class="fas fa-chevron-left"></i></button>
-                    <h2 id="month-year" class="text-lg sm:text-xl font-bold text-center"></h2>
+                    <h2 id="month-year" class="text-xl font-bold text-center"></h2>
                     <button id="next-month" class="p-2 rounded-lg hover:bg-slate-200 transition"><i class="fas fa-chevron-right"></i></button>
                 </div>
 
-                <div class="flex-grow bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col lg:overflow-hidden">
-                    <div id="calendar-header" class="calendar-grid font-bold text-center text-slate-600 p-2 text-xs sm:text-sm flex-shrink-0">
+                <div class="flex-grow bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+                    <div id="calendar-header" class="calendar-grid font-bold text-center text-slate-600 p-2 text-sm flex-shrink-0">
                         <!-- Header hari akan di-generate oleh JavaScript -->
                     </div>
                     <div id="calendar-body" class="calendar-grid border-t border-l border-slate-200 flex-grow overflow-y-auto">
@@ -485,17 +498,17 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
             for (let i = 0; i < firstDay; i++) {
-                calendarBody.innerHTML += `<div class="border-b border-r border-slate-200 bg-slate-50"></div>`;
+                calendarBody.innerHTML += `<div class="p-1 border-b border-r border-slate-200 bg-slate-50"></div>`;
             }
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const cell = document.createElement('div');
                 const dateStr = `${year}-${month + 1}-${day}`;
-                cell.className = 'calendar-day p-2 border-b border-r border-slate-200 relative flex flex-col gap-1';
+                cell.className = 'calendar-day p-1 border-b border-r border-slate-200 relative flex flex-col gap-1';
                 cell.dataset.date = dateStr;
 
                 const dateNumber = document.createElement('span');
-                dateNumber.className = 'date-number mb-1';
+                dateNumber.className = 'date-number mb-1 text-xs text-slate-500 text-center sm:text-left sm:text-sm';
                 dateNumber.textContent = day;
                 cell.appendChild(dateNumber);
 
@@ -523,11 +536,15 @@
         }
 
         function onDragStart(e) {
+            if (window.innerWidth < 1024) { 
+                document.documentElement.classList.add('is-dragging');
+            }
             draggedCard = e.target;
             setTimeout(() => e.target.classList.add('dragging'), 0);
         }
 
         function onDragEnd(e) {
+            document.documentElement.classList.remove('is-dragging');
             e.target.classList.remove('dragging');
             draggedCard = null;
         }
@@ -586,7 +603,12 @@
 
             const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
             days.forEach(day => {
-                calendarHeader.innerHTML += `<div class="p-2">${day}</div>`;
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'p-2';
+                const shortName = day.substring(0,1);
+                const longName = day;
+                dayHeader.innerHTML = `<span class="sm:hidden">${shortName}</span><span class="hidden sm:inline">${longName}</span>`;
+                calendarHeader.appendChild(dayHeader);
             });
             
             updateStateAndRender();
