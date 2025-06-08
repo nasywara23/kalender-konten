@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kalender Konten - Nona Bersih</title>
+    <title>Kalender Konten</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -113,10 +113,23 @@
                     <h2 class="text-xl font-bold text-slate-800">Bank Ide</h2>
                     <i class="fa-regular fa-lightbulb text-indigo-500 text-xl"></i>
                 </div>
-                <div class="mb-4">
-                     <select id="product-filter" class="w-full p-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                        <option value="all" selected>Tampilkan Semua Produk</option>
-                    </select>
+                <!-- NEW: Filter container -->
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="product-filter" class="text-sm font-medium text-slate-600 block mb-1">Produk</label>
+                        <select id="product-filter" class="w-full p-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                            <option value="all" selected>Semua</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="type-filter" class="text-sm font-medium text-slate-600 block mb-1">Jenis</label>
+                         <select id="type-filter" class="w-full p-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                            <option value="all" selected>Semua</option>
+                            <option value="Reels">Reels</option>
+                            <option value="Carousel">Carousel</option>
+                            <option value="Single Image">Single Image</option>
+                        </select>
+                    </div>
                 </div>
                 <div id="idea-bank" class="scroll-container flex-grow overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-1 gap-4 pr-2">
                     <!-- Kartu ide akan di-generate oleh JavaScript -->
@@ -368,7 +381,6 @@
             { id: 'stl15', product: 'Sarung Tangan Latex', type: 'Single Image', title: 'Infografis Ukuran', description: 'Visual panduan ukuran tangan (S, M, L) agar pelanggan tidak salah pilih.'},
         ];
         
-        // UPDATED: Set initial date to June 2025
         let currentDate = new Date(2025, 5, 1);
         let draggedCard = null;
         let scheduledIdeas = new Map();
@@ -396,6 +408,7 @@
         };
 
         const productFilter = document.getElementById('product-filter');
+        const typeFilter = document.getElementById('type-filter'); // NEW: Get type filter
         const ideaBank = document.getElementById('idea-bank');
         const calendarBody = document.getElementById('calendar-body');
         const monthYearEl = document.getElementById('month-year');
@@ -444,11 +457,15 @@
 
             ideaBank.innerHTML = '';
             const selectedProduct = productFilter.value;
+            const selectedType = typeFilter.value; // NEW: Get selected type
+
             contentIdeas.forEach(idea => {
-                if (!scheduledIds.has(idea.id)) {
-                    if (selectedProduct === 'all' || idea.product === selectedProduct) {
-                        ideaBank.appendChild(createCardElement(idea));
-                    }
+                const isScheduled = scheduledIds.has(idea.id);
+                const productMatch = selectedProduct === 'all' || idea.product === selectedProduct;
+                const typeMatch = selectedType === 'all' || idea.type === selectedType;
+
+                if (!isScheduled && productMatch && typeMatch) { // NEW: Check both filters
+                    ideaBank.appendChild(createCardElement(idea));
                 }
             });
         };
@@ -572,6 +589,7 @@
             updateStateAndRender();
 
             productFilter.addEventListener('change', populateIdeaBank);
+            typeFilter.addEventListener('change', populateIdeaBank); // NEW: Add listener for type filter
             
             prevMonthBtn.addEventListener('click', () => {
                 currentDate.setMonth(currentDate.getMonth() - 1);
