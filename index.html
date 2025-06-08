@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalender Konten - Nona Bersih</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+        }
+        .calendar-day {
+            min-height: 140px; 
+            transition: background-color 0.2s;
+        }
+        .kanban-card {
+            cursor: grab;
+            transition: all 0.2s;
+            position: relative; /* Diperlukan untuk positioning ikon copy */
+            padding-bottom: 2rem; /* Ruang untuk ikon copy */
+        }
+        /* Style untuk kartu di kalender (lebih kecil) */
+        .calendar-day .kanban-card {
+            font-size: 0.8rem;
+            padding: 0.5rem;
+            padding-bottom: 2rem;
+        }
+        .calendar-day .kanban-card .description {
+            display: none; /* Default: deskripsi tersembunyi di kalender */
+        }
+        .calendar-day .kanban-card .description.is-visible {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 0.5rem;
+        }
+
+        /* Style untuk kartu di bank ide (lebih besar) */
+        #idea-bank .kanban-card {
+            font-size: initial;
+            padding: 1rem;
+        }
+         #idea-bank .kanban-card .description {
+            display: block; 
+            font-size: 0.875rem;
+        }
+      
+        .kanban-card:active {
+            cursor: grabbing;
+        }
+        .dragging {
+            opacity: 0.6;
+            transform: rotate(4deg);
+            border: 2px dashed #4f46e5;
+        }
+        .drag-over {
+            background-color: rgba(79, 70, 229, 0.1);
+            border: 1px dashed #a5b4fc;
+        }
+        .scroll-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scroll-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .scroll-container::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        .today {
+            background-color: #e0e7ff; 
+            border: 1px solid #c7d2fe;
+        }
+        .today .date-number {
+            color: #4338ca;
+            font-weight: 700;
+        }
+        /* Styles for Copy Icon */
+        .copy-icon-container {
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 9999px;
+            line-height: 1;
+        }
+        #idea-bank .copy-icon-container {
+            display: none; /* Sembunyikan ikon copy di bank ide */
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+            <h1 class="text-2xl font-bold text-slate-900">Kalender Konten - Nona Bersih</h1>
+            <p class="text-md text-slate-500">Drag & drop ide. Jadwal tersimpan otomatis di browser Anda.</p>
+        </header>
+
+        <div class="flex-grow flex flex-col lg:flex-row p-4 gap-6">
+            <!-- Kolom Bank Ide -->
+            <aside class="w-full lg:w-1/3 xl:w-1/4 flex flex-col bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-slate-800">Bank Ide</h2>
+                    <i class="fa-regular fa-lightbulb text-indigo-500 text-xl"></i>
+                </div>
+                <div class="mb-4">
+                     <select id="product-filter" class="w-full p-2 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        <option value="all" selected>Tampilkan Semua Produk</option>
+                    </select>
+                </div>
+                <div id="idea-bank" class="scroll-container flex-grow overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-1 gap-4 pr-2">
+                    <!-- Kartu ide akan di-generate oleh JavaScript -->
+                </div>
+            </aside>
+
+            <!-- Kalender -->
+            <main class="w-full lg:w-2/3 xl:w-3/4 flex flex-col">
+                 <div class="flex justify-between items-center mb-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <button id="prev-month" class="p-2 rounded-lg hover:bg-slate-200 transition"><i class="fas fa-chevron-left"></i></button>
+                    <h2 id="month-year" class="text-xl font-bold text-center"></h2>
+                    <button id="next-month" class="p-2 rounded-lg hover:bg-slate-200 transition"><i class="fas fa-chevron-right"></i></button>
+                </div>
+
+                <div class="flex-grow bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                    <div id="calendar-header" class="calendar-grid font-bold text-center text-slate-600">
+                        <!-- Header hari akan di-generate oleh JavaScript -->
+                    </div>
+                    <div id="calendar-body" class="calendar-grid border-t border-l border-slate-200">
+                        <!-- Sel tanggal akan di-generate oleh JavaScript -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        const contentIdeas = [
+             // 1. CITRUN
+            { id: 'c1', product: 'Citrun', type: 'Reels', title: 'ASMR Cleaning Kerak Panci', description: 'Video close-up suara desis Citrun membersihkan kerak tebal di dasar panci.' },
+            { id: 'c2', product: 'Citrun', type: 'Reels', title: 'Before & After Kilat Keran Air', description: 'Transisi cepat dari keran kusam penuh bercak menjadi kinclong berkilau.' },
+            { id: 'c3', product: 'Citrun', type: 'Reels', title: 'Tutorial Cepat: Shower Kinclong', description: 'Step-by-step merendam kepala shower yang tersumbat kerak hingga airnya lancar kembali.' },
+            { id: 'c4', product: 'Citrun', type: 'Reels', title: 'DIY Pembersih Serbaguna', description: 'Membuat semprotan pembersih dari Citrun, air, dan sedikit sabun untuk berbagai permukaan.' },
+            { id: 'c5', product: 'Citrun', type: 'Reels', title: 'Menyelamatkan Panci Gosong', description: 'Menunjukkan proses merebus air dan Citrun di panci gosong hingga bersih kembali.' },
+            { id: 'c6', product: 'Citrun', type: 'Carousel', title: '5 Benda Musuh Kerak Air', description: 'Mengupas tuntas 5 benda di rumah (teko, keran, shower, dll) yang sering berkerak.' },
+            { id: 'c7', product: 'Citrun', type: 'Carousel', title: 'Panduan Takaran Pas Citrun', description: 'Infografis visual takaran yang tepat untuk berbagai kebutuhan (mesin cuci, WC, dll).' },
+            { id: 'c8', product: 'Citrun', type: 'Carousel', title: 'Citrun vs Cuka: Mana Lebih Baik?', description: 'Perbandingan head-to-head kelebihan Citrun (tidak berbau) vs Cuka untuk bersih-bersih.' },
+            { id: 'c9', product: 'Citrun', type: 'Carousel', title: 'Do\'s and Don\'ts Citrun', description: 'Panduan permukaan apa saja yang aman (stainless) dan tidak aman (marmer) dengan Citrun.' },
+            { id: 'c10', product: 'Citrun', type: 'Carousel', title: 'Membersihkan Mesin Cuci', description: 'Panduan lengkap drum cleaning mesin cuci bukaan atas & depan agar bebas kerak & bau.' },
+            { id: 'c11', product: 'Citrun', type: 'Single Image', title: 'Infografis Kegunaan', description: 'Satu gambar ringkas yang menunjukkan semua kegunaan utama Citrun dengan ikon.' },
+            { id: 'c12', product: 'Citrun', type: 'Single Image', title: 'Foto Produk Estetik', description: 'Flatlay produk Nona Bersih di samping teko stainless steel yang kinclong.' },
+            { id: 'c13', product: 'Citrun', type: 'Single Image', title: 'Quote: Bye Kerak!', description: 'Postingan kutipan yang catchy dan relevan dengan masalah kerak air.' },
+            { id: 'c14', product: 'Citrun', type: 'Single Image', title: 'Testimoni Pelanggan', description: 'Screenshot review memuaskan dari pelanggan yang berhasil mengatasi kerak.' },
+            { id: 'c15', product: 'Citrun', type: 'Single Image', title: 'Tahukah Kamu?', description: 'Fakta menarik bahwa Citrun juga bisa dipakai untuk proses pewarnaan kain tie-dye.' },
+
+            // 2. OXALIC ACID
+            { id: 'o1', product: 'Oxalic Acid', type: 'Reels', title: 'Magic Rust Remover', description: 'Video memuaskan karat tebal di besi yang luntur setelah diolesi pasta Oxalic Acid.' },
+            { id: 'o2', product: 'Oxalic Acid', type: 'Reels', title: 'Toilet Bowl Transformation', description: 'Time-lapse noda kuning membandel di toilet yang hilang, menjadi putih bersih.' },
+            { id: 'o3', product: 'Oxalic Acid', type: 'Reels', title: 'Safety First! Cara Pakai Aman', description: 'Video wajib tonton cara aman menggunakan produk: pakai sarung tangan & masker.' },
+            { id: 'o4', product: 'Oxalic Acid', type: 'Reels', title: 'Mencerahkan Talenan Kayu', description: 'Proses restorasi talenan kayu kusam dan bernoda menjadi cerah seperti baru.' },
+            { id: 'o5', product: 'Oxalic Acid', type: 'Reels', title: 'Noda Tinta Lenyap', description: 'Menghilangkan noda tinta pulpen di baju atau perabotan kayu dengan Oxalic Acid.' },
+            { id: 'o6', product: 'Oxalic Acid', type: 'Carousel', title: 'Panduan Penakluk Noda Karat', description: 'Tutorial lengkap step-by-step membuat pasta dan cara efektif mengaplikasikannya.' },
+            { id: 'o7', product: 'Oxalic Acid', type: 'Carousel', title: 'Peringatan & Keamanan Mutlak', description: 'Infografis wajib simpan tentang APD dan cara penyimpanan Oxalic Acid yang aman.' },
+            { id: 'o8', product: 'Oxalic Acid', type: 'Carousel', title: 'Bedanya dengan Citrun?', description: 'Penjelasan kapan harus pakai Citrun (kerak air) vs Oxalic Acid (noda karat/kayu).' },
+            { id: 'o9', product: 'Oxalic Acid', type: 'Carousel', title: 'FAQ: Pertanyaan Umum', description: 'Menjawab pertanyaan paling sering tentang Oxalic Acid (aman untuk apa, dll).' },
+            { id: 'o10', product: 'Oxalic Acid', type: 'Carousel', title: 'Menghilangkan Noda Kuning di Baju', description: 'Panduan khusus mengatasi noda kuning di area ketiak atau kerah baju putih.' },
+            { id: 'o11', product: 'Oxalic Acid', type: 'Single Image', title: 'Foto Dramatis', description: 'Foto high-impact tangan bersarung tangan sedang mengaplikasikan produk ke besi berkarat.' },
+            { id: 'o12', product: 'Oxalic Acid', type: 'Single Image', title: 'Label Peringatan Keamanan', description: 'Desain grafis yang menyorot ikon bahaya dan anjuran penggunaan APD.' },
+            { id: 'o13', product: 'Oxalic Acid', type: 'Single Image', title: 'Promo Bundle + Sarung Tangan', description: 'Postingan promosi untuk paket hemat Oxalic Acid dan Sarung Tangan Latex.' },
+            { id: 'o14', product: 'Oxalic Acid', type: 'Single Image', title: 'Before-After Lantai Keramik', description: 'Perbandingan lantai keramik kusam dengan yang sudah dibersihkan dari noda.' },
+            { id: 'o15', product: 'Oxalic Acid', type: 'Single Image', title: 'Quote: Untuk Noda Mustahil', description: 'Kutipan yang menonjolkan kekuatan Oxalic Acid untuk noda yang sulit dihilangkan.' },
+
+            // 3. SODIUM PERCARBONATE
+            { id: 'sp1', product: 'Sodium Percarbonate', type: 'Reels', title: 'The Power of Bubbles', description: 'Rendaman baju putih/dekil dengan fokus pada gelembung oksigen aktif yang bekerja.' },
+            { id: 'sp2', product: 'Sodium Percarbonate', type: 'Reels', title: 'Bye Noda Kopi!', description: 'Noda kopi di baju putih langsung hilang setelah direndam air panas dan percarbonate.' },
+            { id: 'sp3', product: 'Sodium Percarbonate', type: 'Reels', title: 'Nat Keramik Jadi Baru', description: 'Time-lapse menyikat nat kamar mandi dari hitam menjadi putih bersih.' },
+            { id: 'sp4', product: 'Sodium Percarbonate', type: 'Reels', title: 'ASMR Rendam Sepatu', description: 'Video memuaskan merendam sepatu kanvas putih kotor, kotorannya luntur perlahan.'},
+            { id: 'sp5', product: 'Sodium Percarbonate', type: 'Reels', title: 'Selamatkan Baju Kelunturan', description: 'Tutorial merendam baju yang terkena luntur hingga warnanya kembali normal.'},
+            { id: 'sp6', product: 'Sodium Percarbonate', type: 'Carousel', title: 'Rahasia Baju Putih Cemerlang', description: 'Edukasi cara kerja pemutih oksigen yang aman untuk serat kain dibanding kaporit.' },
+            { id: 'sp7', product: 'Sodium Percarbonate', type: 'Carousel', title: 'Panduan Perendaman Sempurna', description: 'Infografis takaran, suhu air, dan durasi rendam untuk noda ringan hingga berat.' },
+            { id: 'sp8', product: 'Sodium Percarbonate', type: 'Carousel', title: 'Percarbonate vs. Bleach', description: 'Tabel perbandingan head-to-head (aman warna, ramah lingkungan, tidak berbau).' },
+            { id: 'sp9', product: 'Sodium Percarbonate', type: 'Carousel', title: '5 Noda Membandel Hancur', description: 'Menampilkan 5 jenis noda (saus, kecap, kunyit, dll) yang bisa diatasi.'},
+            { id: 'sp10', product: 'Sodium Percarbonate', type: 'Carousel', title: 'Bukan Cuma Buat Baju!', description: 'Menunjukkan kegunaan lain: membersihkan botol minum, termos, dan talenan.'},
+            { id: 'sp11', product: 'Sodium Percarbonate', type: 'Single Image', title: 'Foto Konsep Baju Bersih', description: 'Tumpukan baju putih yang cerah di sebelah kemasan produk Nona Bersih.' },
+            { id: 'sp12', product: 'Sodium Percarbonate', type: 'Single Image', title: 'Before & After Noda Kopi', description: 'Foto detail perbandingan kain bernoda kopi vs setelah bersih total.' },
+            { id: 'sp13', product: 'Sodium Percarbonate', type: 'Single Image', title: 'Testimoni Seragam Sekolah', description: 'Ulasan dari ibu yang happy karena seragam sekolah anaknya kembali putih cemerlang.'},
+            { id: 'sp14', product: 'Sodium Percarbonate', type: 'Single Image', title: 'Infografis Cara Kerja', description: 'Visualisasi simpel bagaimana produk ini melepaskan oksigen untuk mengangkat noda.'},
+            { id: 'sp15', product: 'Sodium Percarbonate', type: 'Single Image', title: 'Quote: Pemutih Tanpa Was-was', description: 'Kutipan yang menekankan aspek keamanan produk dibandingkan pemutih biasa.'},
+
+            // 4. BAKING SODA
+            { id: 'bs1', product: 'Baking Soda', type: 'Reels', title: 'Fridge Deodorizer Hack', description: 'Video simpel menaruh semangkuk Baking Soda di kulkas untuk menyerap bau tak sedap.' },
+            { id: 'bs2', product: 'Baking Soda', type: 'Reels', title: 'Sink Cleaning Volcano', description: 'Reaksi seru Baking Soda + Citrun/Cuka di wastafel, lalu gosok hingga kinclong.' },
+            { id: 'bs3', product: 'Baking Soda', type: 'Reels', title: 'DIY Air Freshener', description: 'Campur Baking Soda + essential oil di toples untuk pengharum ruangan alami & hemat.' },
+            { id: 'bs4', product: 'Baking Soda', type: 'Reels', title: 'Microwave Bersih Tanpa Gosok', description: 'Menguapkan air & Baking Soda di microwave agar kerak makanan mudah dilap.' },
+            { id: 'bs5', product: 'Baking Soda', type: 'Reels', title: 'Pasta Pembersih Serbaguna', description: 'Membuat pasta Baking Soda untuk membersihkan noda di kompor atau sela keramik.' },
+            { id: 'bs6', product: 'Baking Soda', type: 'Carousel', title: '10+ Kegunaan di Dapur', description: 'Listicle kegunaan Baking Soda di dapur (oven, talenan, wastafel, kulkas, dll).' },
+            { id: 'bs7', product: 'Baking Soda', type: 'Carousel', title: 'Selamat Tinggal Bau Apek', description: 'Panduan lengkap menghilangkan bau di karpet, sepatu, dan tempat sampah.' },
+            { id: 'bs8', product: 'Baking Soda', type: 'Carousel', title: 'Baking Soda vs. Soda Ash', description: 'Penjelasan visual perbedaan pH dan kegunaan utama antara keduanya, jangan sampai tertukar!' },
+            { id: 'bs9', product: 'Baking Soda', type: 'Carousel', title: 'DIY Scrub & Perawatan Tubuh', description: 'Resep aman membuat lulur atau campuran rendaman kaki dengan Baking Soda.' },
+            { id: 'bs10', product: 'Baking Soda', type: 'Carousel', title: 'Membersihkan Mainan Anak', description: 'Cara aman dan alami membersihkan mainan anak agar bebas kuman dan bahan kimia keras.' },
+            { id: 'bs11', product: 'Baking Soda', type: 'Single Image', title: 'Tips Cepat: Bau Tempat Sampah', description: 'Postingan teks simpel: "Taburkan Baking Soda di dasar tempat sampah sebelum memasang plastik baru."' },
+            { id: 'bs12', product: 'Baking Soda', type: 'Single Image', title: 'Foto Minimalis Kulkas Rapi', description: 'Semangkuk Baking Soda di dalam kulkas yang bersih dan terorganisir.' },
+            { id: 'bs13', product: 'Baking Soda', type: 'Single Image', title: 'Quote: Solusi Lembut', description: 'Kutipan "Solusi lembut untuk masalah berat di rumah Anda."' },
+            { id: 'bs14', product: 'Baking Soda', type: 'Single Image', title: 'Testimoni Bau Durian', description: 'Review lucu pelanggan yang kulkasnya selamat dari invasi bau durian berkat Baking Soda.' },
+            { id: 'bs15', product: 'Baking Soda', type: 'Single Image', title: 'Infografis Perbedaan', description: 'Infografis simpel: "Untuk Kue & Kebersihan Ringan" vs. Soda Ash "Untuk Kebersihan Berat".' },
+
+            // 5. SODA ASH DENSE
+            { id: 'sad1', product: 'Soda Ash Dense', type: 'Reels', title: 'Laundry Booster Ajaib', description: 'Buih deterjen jadi melimpah saat air ditambah Soda Ash, bukti air jadi lunak.' },
+            { id: 'sad2', product: 'Soda Ash Dense', type: 'Reels', title: 'Rontokkan Minyak di Filter Hood', description: 'Demonstrasi merendam filter penyedot asap dapur yang super berminyak.' },
+            { id: 'sad3', product: 'Soda Ash Dense', type: 'Reels', title: 'DIY Sabun Colek Ampuh', description: 'Tutorial singkat membuat sabun colek ekonomis dari Soda Ash dan bahan lain.' },
+            { id: 'sad4', product: 'Soda Ash Dense', type: 'Reels', title: 'Membersihkan Panci Super Gosong', description: 'Teknik merebus air dan Soda Ash untuk mengangkat kerak hitam tebal di panci.' },
+            { id: 'sad5', product: 'Soda Ash Dense', type: 'Reels', title: 'Mencuci Kain Lap Super Dekil', description: 'Proses merendam dan mencuci kain lap dapur yang penuh noda minyak dan saus.' },
+            { id: 'sad6', product: 'Soda Ash Dense', type: 'Carousel', title: 'Air Sadah Bikin Boros Sabun?', description: 'Edukasi tentang air sadah (hard water) dan peran Soda Ash melunakkannya.' },
+            { id: 'sad7', product: 'Soda Ash Dense', type: 'Carousel', title: 'Panduan Laundry Anti Gagal', description: 'Infografis takaran Soda Ash untuk berbagai level kesadahan air dan beban cucian.' },
+            { id: 'sad8', product: 'Soda Ash Dense', type: 'Carousel', title: '5 Benda Berminyak Jadi Kinclong', description: 'Daftar benda-benda di dapur yang bisa bersih maksimal dengan Soda Ash.' },
+            { id: 'sad9', product: 'Soda Ash Dense', type: 'Carousel', title: 'Bukan untuk Panci Aluminium!', description: 'Peringatan penting untuk tidak menggunakan Soda Ash pada bahan aluminium & non-stick.' },
+            { id: 'sad10', product: 'Soda Ash Dense', type: 'Carousel', title: 'Menaikkan pH Air (Advanced)', description: 'Konten edukasi singkat untuk pengguna yang lebih ahli (misal: untuk tie-dye atau kolam).' },
+            { id: 'sad11', product: 'Soda Ash Dense', type: 'Single Image', title: 'Infografis Cara Kerja', description: 'Visualisasi simpel bagaimana Soda Ash mengikat mineral di air sehingga sabun bekerja efektif.' },
+            { id: 'sad12', product: 'Soda Ash Dense', type: 'Single Image', title: 'Before-After Panci Gosong', description: 'Foto perbandingan panci yang hitam legam dengan yang sudah bersih mengkilap.' },
+            { id: 'sad13', product: 'Soda Ash Dense', type: 'Single Image', title: 'Quote: Hemat Deterjen', description: 'Kutipan "Hemat deterjen, hasil cucian lebih cemerlang."' },
+            { id: 'sad14', product: 'Soda Ash Dense', type: 'Single Image', title: 'Testimoni Busa Melimpah', description: 'Ulasan pelanggan yang kaget karena cuciannya jadi lebih bersih & busa banyak.' },
+            { id: 'sad15', product: 'Soda Ash Dense', type: 'Single Image', title: 'Peta Kesadahan Air Indonesia', description: 'Konten informatif tentang daerah mana saja di Indonesia yang punya masalah air sadah.' },
+
+            // 6. CAUSTIC SODA
+            { id: 'cs1', product: 'Caustic Soda', type: 'Reels', title: 'Simulasi Saluran Mampet', description: 'Simulasi aman di pipa bening bagaimana Caustic Soda melarutkan gumpalan lemak.' },
+            { id: 'cs2', product: 'Caustic Soda', type: 'Reels', title: 'WAJIB TONTON: Step Keamanan', description: 'Video animasi langkah keamanan: Ventilasi, APD lengkap, tuang perlahan, siram banyak air.' },
+            { id: 'cs3', product: 'Caustic Soda', type: 'Reels', title: 'Membersihkan Noda Oli di Garasi', description: 'Demonstrasi membersihkan lantai semen dari tumpahan oli yang membandel. (Dengan APD lengkap).' },
+            { id: 'cs4', product: 'Caustic Soda', type: 'Reels', title: 'DIY Sabun Batang (Hobbyist)', description: 'Pengenalan proses saponifikasi untuk para hobbyist sabun (sangat menekankan keamanan).' },
+            { id: 'cs5', product: 'Caustic Soda', type: 'Reels', title: 'Merontokkan Cat dari Besi', description: 'Time-lapse proses paint stripping dari pagar atau perabotan besi tua. (Dengan APD lengkap).' },
+            { id: 'cs6', product: 'Caustic Soda', type: 'Carousel', title: 'PANDUAN KEAMANAN MUTLAK', description: 'Carousel WAJIB SIMPAN berisi semua info keselamatan, APD, dan pertolongan pertama.' },
+            { id: 'cs7', product: 'Caustic Soda', type: 'Carousel', title: 'Sumbatan yang Bisa & Tidak Bisa', description: 'Penjelasan sumbatan organik (lemak, rambut) vs anorganik (plastik, pembalut).' },
+            { id: 'cs8', product: 'Caustic Soda', type: 'Carousel', title: 'Caustic Soda vs. Produk Lain', description: 'Perbandingan dengan pembersih saluran lain dan kapan harus menggunakan Caustic Soda.' },
+            { id: 'cs9', product: 'Caustic Soda', type: 'Carousel', title: 'Pertolongan Pertama Jika Terkena', description: 'Informasi krusial dan harus jelas tentang apa yang harus dilakukan jika terjadi kontak kulit/mata.' },
+            { id: 'cs10', product: 'Caustic Soda', type: 'Carousel', title: 'FAQ untuk Pemula', description: 'Menjawab semua pertanyaan dasar dengan penekanan utama pada aspek keselamatan.' },
+            { id: 'cs11', product: 'Caustic Soda', type: 'Single Image', title: 'APD WAJIB!', description: 'Postingan grafis tegas: "JANGAN GUNAKAN TANPA KACAMATA & SARUNG TANGAN TAHAN KIMIA!"' },
+            { id: 'cs12', product: 'Caustic Soda', type: 'Single Image', title: 'Checklist Keamanan Anda', description: 'Infografis checklist (kacamata, sarung tangan, masker, ventilasi) sebelum memulai.' },
+            { id: 'cs13', product: 'Caustic Soda', type: 'Single Image', title: 'Jauhkan dari Jangkauan Anak!', description: 'Peringatan visual yang kuat tentang bahaya produk ini jika tidak disimpan dengan benar.' },
+            { id: 'cs14', product: 'Caustic Soda', type: 'Single Image', title: 'Testimoni Saluran Lancar', description: 'Ulasan pelanggan yang berhasil mengatasi saluran mampet parah (disertai disclaimer keamanan).' },
+            { id: 'cs15', product: 'Caustic Soda', type: 'Single Image', title: 'Tanda Peringatan Korosif', description: 'Edukasi arti simbol bahaya korosif pada kemasan produk.' },
+            
+            // 7. TAWAS BUBUK
+            { id: 'tb1', product: 'Tawas Bubuk', type: 'Reels', title: 'DIY Deodoran Spray', description: 'Tutorial super cepat melarutkan tawas dalam air dan memasukkannya ke botol spray.'},
+            { id: 'tb2', product: 'Tawas Bubuk', type: 'Reels', title: 'Tes Penjernihan Air', description: 'Video memuaskan melihat air keruh di dalam toples perlahan menjadi jernih setelah diberi tawas.'},
+            { id: 'tb3', product: 'Tawas Bubuk', type: 'Reels', title: 'Hacks After-Shave', description: 'Menunjukkan cara menggunakan larutan tawas untuk menghentikan pendarahan kecil akibat pisau cukur.'},
+            { id: 'tb4', product: 'Tawas Bubuk', type: 'Reels', title: 'Mengawetkan Bunga Segar', description: 'Teknik menggunakan tawas untuk membantu proses pengeringan bunga agar warnanya tetap cantik.'},
+            { id: 'tb5', product: 'Tawas Bubuk', type: 'Reels', title: 'Rahasia Acar Lebih Krispi', description: 'Tips singkat menambahkan sejumput tawas pada rendaman acar agar hasilnya lebih renyah.'},
+            { id: 'tb6', product: 'Tawas Bubuk', type: 'Carousel', title: '5 Manfaat Ajaib Tawas', description: 'Menjelaskan 5 kegunaan utama: deodoran, penjernih air, after-shave, pengawet bunga, dan perenyah acar.'},
+            { id: 'tb7', product: 'Tawas Bubuk', type: 'Carousel', title: 'Panduan Deodoran Tawas Lengkap', description: 'Step-by-step membuat deodoran spray dan roll-on, lengkap dengan takaran dan tips.'},
+            { id: 'tb8', product: 'Tawas Bubuk', type: 'Carousel', title: 'Solusi Air Sumur Keruh', description: 'Panduan untuk pemilik rumah cara menjernihkan air di tandon atau bak penampungan.'},
+            { id: 'tb9', product: 'Tawas Bubuk', type: 'Carousel', title: 'Mitos & Fakta Ketiak Hitam', description: 'Membahas cara kerja tawas sebagai deodoran dan efeknya pada kulit ketiak.'},
+            { id: 'tb10', product: 'Tawas Bubuk', type: 'Carousel', title: 'Amankah Tawas untuk Kulit?', description: 'Menjelaskan profil keamanan tawas sebagai produk topikal (pemakaian luar).'},
+            { id: 'tb11', product: 'Tawas Bubuk', type: 'Single Image', title: 'Foto Estetik: Jernih & Segar', description: 'Produk Tawas Bubuk di samping segelas air jernih dan botol spray minimalis.'},
+            { id: 'tb12', product: 'Tawas Bubuk', type: 'Single Image', title: 'Quote: Jernih Alami', description: 'Kutipan "Jernih Alami, Segar Sepanjang Hari."' },
+            { id: 'tb13', product: 'Tawas Bubuk', type: 'Single Image', title: 'Infografis 5 Manfaat', description: 'Ikon-ikon yang mewakili kegunaan utama tawas (ketiak, tetesan air, bunga, pisau cukur).'},
+            { id: 'tb14', product: 'Tawas Bubuk', type: 'Single Image', title: 'Testimoni Air Jernih', description: 'Screenshot ulasan pelanggan yang berhasil menjernihkan air di rumahnya.'},
+            { id: 'tb15', product: 'Tawas Bubuk', type: 'Single Image', title: 'Tips Rendaman Kaki', description: 'Tips singkat: "Larutkan sedikit tawas di air rendaman kaki untuk membantu mengurangi bau."' },
+
+            // 8. SILICA GEL
+            { id: 'sg1', product: 'Silica Gel', type: 'Reels', title: 'Selamatkan HP Basah!', description: 'Simulasi memasukkan HP basah (dummy) ke dalam wadah berisi Silica Gel untuk menyerap air.' },
+            { id: 'sg2', product: 'Silica Gel', type: 'Reels', title: 'Kamera Anti Jamur', description: 'Menaruh beberapa sachet Silica Gel di dalam tas kamera untuk melindungi lensa dari jamur.' },
+            { id: 'sg3', product: 'Silica Gel', type: 'Reels', title: 'Jendela Mobil Anti Embun', description: 'Mengisi kaus kaki dengan Silica Gel dan meletakkannya di dashboard untuk mengurangi embun.' },
+            { id: 'sg4', product: 'Silica Gel', type: 'Reels', title: 'ASMR Tuang Silica Gel', description: 'Suara memuaskan saat menuangkan butiran Silica Gel dari kemasan ke dalam wadah.' },
+            { id: 'sg5', product: 'Silica Gel', type: 'Reels', title: 'Re-aktivasi di Oven', description: 'Menunjukkan cara memanggang Silica Gel di oven agar bisa digunakan kembali.' },
+            { id: 'sg6', product: 'Silica Gel', type: 'Carousel', title: '10 Tempat Wajib Taruh Silica Gel', description: 'Daftar lokasi penting: lemari pakaian, kotak sepatu, laci dokumen, tas kamera, kotak obat, dll.' },
+            { id: 'sg7', product: 'Silica Gel', type: 'Carousel', title: 'Cara Menggunakan Kembali', description: 'Panduan lengkap mere-aktivasi Silica Gel di oven atau microwave agar hemat.' },
+            { id: 'sg8', product: 'Silica Gel', type: 'Carousel', title: 'Lindungi Barang Saat Musim Hujan', description: 'Tips menggunakan Silica Gel untuk melindungi barang kulit dan elektronik saat udara lembap.' },
+            { id: 'sg9', product: 'Silica Gel', type: 'Carousel', title: 'Silica Gel vs. Kamper', description: 'Perbandingan fungsi (serap lembap vs. usir serangga/bau) dan kapan harus menggunakannya.' },
+            { id: 'sg10', product: 'Silica Gel', type: 'Carousel', title: 'DIY Kantong Penyerap Lembap', description: 'Tutorial membuat kantong Silica Gel sendiri menggunakan filter kopi atau kantong teh kosong.' },
+            { id: 'sg11', product: 'Silica Gel', type: 'Single Image', title: 'Foto Pelindung Barang', description: 'Silica Gel sachet diletakkan dengan rapi di dalam sepatu kulit dan tas branded.' },
+            { id: 'sg12', product: 'Silica Gel', type: 'Single Image', title: 'Quote: Musuh Kelembapan', description: 'Kutipan "Musuh Utama Kelembapan dan Jamur."' },
+            { id: 'sg13', product: 'Silica Gel', type: 'Single Image', title: 'Infografis Barang Dilindungi', description: 'Ikon kamera, sepatu, paspor, dan pil untuk menunjukkan apa saja yang perlu dilindungi.' },
+            { id: 'sg14', product: 'Silica Gel', type: 'Single Image', title: 'Testimoni Dokumen Aman', description: 'Review pelanggan yang dokumen pentingnya selamat dari jamur berkat Silica Gel.' },
+            { id: 'sg15', product: 'Silica Gel', type: 'Single Image', title: 'PERINGATAN: Jangan Dimakan!', description: 'Postingan grafis yang jelas dengan ikon larangan untuk anak-anak dan hewan peliharaan.' },
+
+            // 9. GARAM INDUSTRI (NACL)
+            { id: 'gi1', product: 'Garam Industri', type: 'Reels', title: 'Basmi Rumput Liar Paving Block', description: 'Before-after membasmi rumput liar di sela paving block dengan larutan garam.' },
+            { id: 'gi2', product: 'Garam Industri', type: 'Reels', title: 'DIY Pembersih Saluran Air', description: 'Menuang air panas, garam, dan baking soda ke saluran cuci piring untuk melarutkan lemak.' },
+            { id: 'gi3', product: 'Garam Industri', type: 'Reels', title: 'Cairkan Bunga Es Cepat', description: 'Mempercepat proses pencairan bunga es tebal di freezer dengan menaburkan garam.' },
+            { id: 'gi4', product: 'Garam Industri', type: 'Reels', title: 'Angkat Noda Kopi di Karpet', description: 'Menunjukkan cara menggunakan pasta garam untuk mengangkat tumpahan kopi/anggur segar.' },
+            { id: 'gi5', product: 'Garam Industri', type: 'Reels', title: 'Kreasi Cat Air Garam', description: 'Proyek kerajinan tangan seru untuk anak, menunjukkan efek unik garam pada cat air basah.' },
+            { id: 'gi6', product: 'Garam Industri', type: 'Carousel', title: '5 Hacks Garam Non-Dapur', description: 'Listicle kegunaan tak terduga: membasmi rumput, membersihkan talenan, mengusir semut, dll.' },
+            { id: 'gi7', product: 'Garam Industri', type: 'Carousel', title: 'Garam Dapur vs Garam Industri', description: 'Menjelaskan perbedaan kemurnian dan tujuan penggunaan. Wajib ada penekanan "JANGAN DIMAKAN".' },
+            { id: 'gi8', product: 'Garam Industri', type: 'Carousel', title: 'Panduan Membasmi Gulma', description: 'Cara menggunakan garam untuk membasmi gulma tanpa merusak tanaman hias di sekitarnya.' },
+            { id: 'gi9', product: 'Garam Industri', type: 'Carousel', title: 'Membersihkan Panci Besi & Tembaga', description: 'Tutorial menggunakan garam dan lemon untuk menggosok dan mengilapkan peralatan masak logam.' },
+            { id: 'gi10', product: 'Garam Industri', type: 'Carousel', title: 'FAQ Garam Industri', description: 'Menjawab pertanyaan umum seputar keamanan dan aplikasi produk di sekitar rumah.' },
+            { id: 'gi11', product: 'Garam Industri', type: 'Single Image', title: 'Foto Aksi Membasmi Gulma', description: 'Tangan sedang menaburkan garam di sela-sela paving block yang ditumbuhi rumput.' },
+            { id: 'gi12', product: 'Garam Industri', type: 'Single Image', title: 'Quote: Solusi Kuat Alam', description: 'Kutipan yang menonjolkan kekuatan alami dari produk ini untuk masalah rumah tangga.' },
+            { id: 'gi13', product: 'Garam Industri', type: 'Single Image', title: 'Infografis Kegunaan', description: 'Ikon yang mewakili fungsi utama: gulma, saluran air, es, dan noda karpet.' },
+            { id: 'gi14', product: 'Garam Industri', type: 'Single Image', title: 'PERINGATAN: BUKAN UNTUK DIMAKAN', description: 'Postingan grafis yang sangat tegas dengan ikon sendok dan garpu dicoret.' },
+            { id: 'gi15', product: 'Garam Industri', type: 'Single Image', title: 'Testimoni Halaman Rapi', description: 'Foto before-after jalan setapak di taman dari pelanggan yang puas.' },
+            
+            // 10. GARAM EPSOM 
+            { id: 'ge1', product: 'Garam Epsom', type: 'Reels', title: 'DIY Rendaman Kaki Relaksasi', description: 'Video estetik menyiapkan rendaman kaki dengan air hangat, garam epsom, dan essential oil.'},
+            { id: 'ge2', product: 'Garam Epsom', type: 'Reels', title: 'Pupuk Ajaib untuk Tomat & Cabai', description: 'Menunjukkan cara melarutkan garam epsom untuk menyiram tanaman agar buahnya lebat.'},
+            { id: 'ge3', product: 'Garam Epsom', type: 'Reels', title: 'ASMR Bath Bomb DIY', description: 'Proses mencampur bahan-bahan bath bomb, termasuk garam epsom, dan mencetaknya.'},
+            { id: 'ge4', product: 'Garam Epsom', type: 'Reels', title: 'Scrub Badan Homemade', description: 'Tutorial singkat mencampur garam epsom dengan minyak kelapa untuk lulur alami.'},
+            { id: 'ge5', product: 'Garam Epsom', type: 'Reels', title: 'Mengatasi Kaki Pegal', description: 'Video before-after ekspresi wajah lelah menjadi rileks setelah merendam kaki.'},
+            { id: 'ge6', product: 'Garam Epsom', type: 'Carousel', title: '5 Manfaat Garam Epsom', description: 'Mengupas manfaat utama: relaksasi otot, pupuk tanaman, eksfoliasi kulit, dll.'},
+            { id: 'ge7', product: 'Garam Epsom', type: 'Carousel', title: 'Panduan Spa di Rumah', description: 'Tips lengkap menciptakan pengalaman spa di rumah dengan rendaman garam epsom.'},
+            { id: 'ge8', product: 'Garam Epsom', type: 'Carousel', title: 'Menyuburkan Taman Anda', description: 'Panduan takaran dan cara aplikasi garam epsom untuk berbagai jenis tanaman.'},
+            { id: 'ge9', product: 'Garam Epsom', type: 'Carousel', title: 'Beda Garam Epsom & Garam Biasa', description: 'Penjelasan kandungan kimia (Magnesium Sulfat vs Natrium Klorida) dan fungsinya.'},
+            { id: 'ge10', product: 'Garam Epsom', type: 'Carousel', title: 'Resep Lulur & Masker Wajah', description: 'Kumpulan resep DIY perawatan kecantikan menggunakan garam epsom.'},
+            { id: 'ge11', product: 'Garam Epsom', type: 'Single Image', title: 'Foto Me-Time Estetik', description: 'Flatlay produk dengan handuk, lilin, dan mangkuk rendaman kaki yang cantik.'},
+            { id: 'ge12', product: 'Garam Epsom', type: 'Single Image', title: 'Quote: Relaksasi Sempurna', description: 'Kutipan "Lepaskan lelah, temukan relaksasi sempurnamu."' },
+            { id: 'ge13', product: 'Garam Epsom', type: 'Single Image', title: 'Infografis Manfaat Ganda', description: 'Ikon yang menunjukkan manfaat untuk tubuh (otot rileks) dan tanaman (hijau subur).'},
+            { id: 'ge14', product: 'Garam Epsom', type: 'Single Image', title: 'Testimoni Tanaman Subur', description: 'Before-after foto tanaman cabai pelanggan yang jadi lebih berbuah lebat.'},
+            { id: 'ge15', product: 'Garam Epsom', type: 'Single Image', title: 'Tips Cepat Rambut Bervolume', description: 'Tips singkat: "Campurkan sedikit Garam Epsom ke kondisioner untuk menambah volume rambut."' },
+
+            // 11. KOH 
+            { id: 'koh1', product: 'KOH', type: 'Reels', title: 'Proses Awal Sabun Cair', description: 'Time-lapse (dengan penekanan keamanan) proses pelarutan KOH dalam air (menghasilkan panas).'},
+            { id: 'koh2', product: 'KOH', type: 'Reels', title: 'Tes pH Sabun Cair DIY', description: 'Video singkat menunjukkan pentingnya tes pH pada sabun cair buatan sendiri agar aman di kulit.'},
+            { id: 'koh3', product: 'KOH', type: 'Reels', title: 'APD Lengkap Sebelum Mulai', description: 'Transisi cepat dari wajah bersih ke wajah yang sudah memakai kacamata google dan masker respirator.'},
+            { id: 'koh4', product: 'KOH', type: 'Reels', title: 'Dari Pasta ke Sabun Bening', description: 'Video memuaskan perubahan pasta sabun KOH setelah proses curing menjadi sabun cair bening.'},
+            { id: 'koh5', product: 'KOH', type: 'Reels', title: 'Perbedaan KOH & NaOH', description: 'Animasi singkat: KOH -> Sabun Cair, NaOH -> Sabun Batang.'},
+            { id: 'koh6', product: 'KOH', type: 'Carousel', title: 'PANDUAN KEAMANAN KOH', description: 'Carousel wajib simpan berisi semua info keselamatan, APD, dan pertolongan pertama.'},
+            { id: 'koh7', product: 'KOH', type: 'Carousel', title: 'Pengenalan Sabun Cair DIY', description: 'Penjelasan dasar untuk pemula tentang apa itu KOH dan perannya dalam saponifikasi.'},
+            { id: 'koh8', product: 'KOH', type: 'Carousel', title: 'Alat & Bahan Wajib Pemula', description: 'Checklist visual alat dan bahan yang dibutuhkan untuk mulai membuat sabun cair.'},
+            { id: 'koh9', product: 'KOH', type: 'Carousel', title: 'Memahami Lye Calculator', description: 'Tutorial singkat cara menggunakan kalkulator saponifikasi online untuk KOH.'},
+            { id: 'koh10', product: 'KOH', type: 'Carousel', title: 'FAQ untuk Hobbyist Sabun', description: 'Menjawab pertanyaan teknis yang sering ditanyakan oleh para pembuat sabun pemula.'},
+            { id: 'koh11', product: 'KOH', type: 'Single Image', title: 'Fokus pada Keamanan', description: 'Foto produk KOH di samping APD lengkap (kacamata, sarung tangan, masker).'},
+            { id: 'koh12', product: 'KOH', type: 'Single Image', title: 'Quote: Untuk Para Kreator', description: 'Kutipan "Bahan utama di balik sabun cair kreasimu."' },
+            { id: 'koh13', product: 'KOH', type: 'Single Image', title: 'Infografis KOH vs NaOH', description: 'Perbandingan visual sederhana antara KOH untuk sabun cair dan NaOH untuk sabun batang.'},
+            { id: 'koh14', product: 'KOH', type: 'Single Image', title: 'Peringatan Keras', description: 'Grafis tegas "SANGAT BERBAHAYA JIKA TERSENTUH! GUNAKAN PERLINDUNGAN EKSTRA!"'},
+            { id: 'koh15', product: 'KOH', type: 'Single Image', title: 'Testimoni Sabun Cair DIY', description: 'Foto hasil sabun cair buatan pelanggan (disertai disclaimer keamanan).'},
+
+            // 12. STEARIC ACID 
+            { id: 'sa1', product: 'Stearic Acid', type: 'Reels', title: 'Rahasia Lilin Tahan Lama', description: 'Perbandingan time-lapse lilin dengan dan tanpa Stearic Acid yang menyala.'},
+            { id: 'sa2', product: 'Stearic Acid', type: 'Reels', title: 'Membuat Sabun Batang Keras', description: 'Menambahkan Stearic Acid ke adonan sabun untuk menunjukkan hasil akhir yang lebih padat.'},
+            { id: 'sa3', product: 'Stearic Acid', type: 'Reels', title: 'ASMR Pelelehan Wax', description: 'Video memuaskan saat melelehkan soy wax bersama butiran Stearic Acid.'},
+            { id: 'sa4', product: 'Stearic Acid', type: 'Reels', title: 'DIY Losion Bar', description: 'Tutorial singkat membuat losion dalam bentuk batangan menggunakan Stearic Acid sebagai pengental.'},
+            { id: 'sa5', product: 'Stearic Acid', type: 'Reels', title: 'Tips Warna Lilin Lebih Pekat', description: 'Menunjukkan bagaimana Stearic Acid membantu pewarna pada lilin menjadi lebih cerah.'},
+            { id: 'sa6', product: 'Stearic Acid', type: 'Carousel', title: '5 Alasan Pakai Stearic Acid', description: 'Menjelaskan 5 keuntungan: lilin lebih keras, tahan lama, warna pekat, sabun lebih padat, dll.'},
+            { id: 'sa7', product: 'Stearic Acid', type: 'Carousel', title: 'Panduan Membuat Lilin untuk Pemula', description: 'Step-by-step dasar membuat lilin, termasuk kapan dan berapa banyak Stearic Acid ditambahkan.'},
+            { id: 'sa8', product: 'Stearic Acid', type: 'Carousel', title: 'Stearic Acid dalam Kosmetik DIY', description: 'Menjelaskan perannya sebagai pengemulsi dan pengental dalam losion dan krim buatan sendiri.'},
+            { id: 'sa9', product: 'Stearic Acid', type: 'Carousel', title: 'Takaran Tepat untuk Hasil Maksimal', description: 'Panduan persentase penggunaan Stearic Acid untuk berbagai jenis lilin dan sabun.'},
+            { id: 'sa10', product: 'Stearic Acid', type: 'Carousel', title: 'FAQ dari Para Crafter', description: 'Menjawab pertanyaan yang sering diajukan oleh para pembuat lilin dan sabun.'},
+            { id: 'sa11', product: 'Stearic Acid', type: 'Single Image', title: 'Foto Hasil Karya', description: 'Foto lilin dan sabun batang yang cantik dan sempurna hasil penggunaan Stearic Acid.'},
+            { id: 'sa12', product: 'Stearic Acid', type: 'Single Image', title: 'Quote: Kunci Kesempurnaan', description: 'Kutipan "Kunci kesempurnaan di setiap lilin dan sabun karyamu."' },
+            { id: 'sa13', product: 'Stearic Acid', type: 'Single Image', 'title': 'Infografis Fungsi Utama', 'description': 'Ikon lilin, sabun batang, dan botol losion untuk menunjukkan fungsi utamanya.'},
+            { id: 'sa14', product: 'Stearic Acid', type: 'Single Image', 'title': 'Testimoni Lilin Awet', 'description': 'Ulasan pelanggan yang puas karena lilin buatannya jadi lebih tahan lama.'},
+            { id: 'sa15', product: 'Stearic Acid', type: 'Single Image', 'title': 'Bahan Turunan Nabati', 'description': 'Informasi bahwa Stearic Acid yang dijual adalah turunan dari kelapa sawit (palm-based).'},
+
+            // 13. SARUNG TANGAN LATEX 
+            { id: 'stl1', product: 'Sarung Tangan Latex', type: 'Reels', title: 'Pasangan Wajib Produk Kimia', description: 'Transisi dari memegang botol Caustic Soda ke tangan yang sudah memakai sarung tangan.' },
+            { id: 'stl2', product: 'Sarung Tangan Latex', type: 'Reels', title: 'Uji Ketahanan Sobek', description: 'Menunjukkan sarung tangan tidak mudah sobek saat dipakai menggosok permukaan kasar.'},
+            { id: 'stl3', product: 'Sarung Tangan Latex', type: 'Reels', title: 'Tips Memakai & Melepas yang Benar', description: 'Video edukasi cara melepas sarung tangan agar bagian kotor tidak kena kulit.'},
+            { id: 'stl4', product: 'Sarung Tangan Latex', type: 'Reels', title: 'ASMR Sarung Tangan', description: 'Suara memuaskan saat memakai dan melepas sarung tangan latex.'},
+            { id: 'stl5', product: 'Sarung Tangan Latex', type: 'Reels', title: 'Dari Mengecat sampai Berkebun', description: 'Kompilasi singkat berbagai aktivitas rumah tangga yang memerlukan sarung tangan.'},
+            { id: 'stl6', product: 'Sarung Tangan Latex', type: 'Carousel', title: 'Pilih Ukuran yang Pas!', description: 'Panduan cara mengukur tangan agar sarung tangan nyaman dan tidak longgar/sobek.'},
+            { id: 'stl7', product: 'Sarung Tangan Latex', type: 'Carousel', title: 'Kapan Harus Ganti Sarung Tangan?', description: 'Edukasi tentang tanda-tanda sarung tangan sudah tidak layak pakai.'},
+            { id: 'stl8', product: 'Sarung Tangan Latex', type: 'Carousel', title: 'Latex vs Nitrile vs Vinyl', description: 'Perbandingan singkat kelebihan masing-masing jenis sarung tangan untuk berbagai keperluan.'},
+            { id: 'stl9', product: 'Sarung Tangan Latex', type: 'Carousel', title: '5 Momen Wajib Pakai Sarung Tangan', description: 'Listicle: saat bersih-bersih dengan kimia, memegang makanan mentah, berkebun, dll.'},
+            { id: 'stl10', product: 'Sarung Tangan Latex', type: 'Carousel', title: 'Alergi Latex? Ini Solusinya', description: 'Informasi tentang alergi latex dan merekomendasikan alternatif (jika tersedia).'},
+            { id: 'stl11', product: 'Sarung Tangan Latex', type: 'Single Image', title: 'Quote: Tangan Aman, Hati Tenang', description: 'Postingan kutipan yang menekankan pentingnya keselamatan.'},
+            { id: 'stl12', product: 'Sarung Tangan Latex', type: 'Single Image', title: 'Foto Aksi Pelindung Tangan', description: 'Tangan yang memakai sarung tangan Nona Bersih sedang melakukan pekerjaan pembersihan.'},
+            { id: 'stl13', product: 'Sarung Tangan Latex', type: 'Single Image', title: 'Bundling Promo Wajib', description: 'Promosi "Setiap pembelian Caustic Soda/Oxalic Acid/KOH wajib disertai Sarung Tangan".'},
+            { id: 'stl14', product: 'Sarung Tangan Latex', type: 'Single Image', title: 'Testimoni Tangan Mulus', description: 'Ulasan pelanggan yang tangannya tetap mulus setelah bersih-bersih hebat.'},
+            { id: 'stl15', product: 'Sarung Tangan Latex', type: 'Single Image', title: 'Infografis Ukuran', description: 'Visual panduan ukuran tangan (S, M, L) agar pelanggan tidak salah pilih.'},
+        ];
+        
+        // UPDATED: Set initial date to June 2025
+        let currentDate = new Date(2025, 5, 1);
+        let draggedCard = null;
+        let scheduledIdeas = new Map();
+        const STORAGE_KEY = 'nonaBersihCalendarSchedule';
+
+        // --- Functions for saving and loading state ---
+        const saveStateToLocalStorage = () => {
+            const serializableSchedule = Array.from(scheduledIdeas.entries());
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(serializableSchedule));
+        };
+
+        const loadStateFromLocalStorage = () => {
+            const savedState = localStorage.getItem(STORAGE_KEY);
+            if (savedState) {
+                try {
+                    const parsedState = JSON.parse(savedState);
+                    scheduledIdeas = new Map(parsedState);
+                } catch (e) {
+                    console.error("Failed to parse saved state:", e);
+                    scheduledIdeas = new Map();
+                }
+            } else {
+                scheduledIdeas = new Map();
+            }
+        };
+
+        const productFilter = document.getElementById('product-filter');
+        const ideaBank = document.getElementById('idea-bank');
+        const calendarBody = document.getElementById('calendar-body');
+        const monthYearEl = document.getElementById('month-year');
+        const prevMonthBtn = document.getElementById('prev-month');
+        const nextMonthBtn = document.getElementById('next-month');
+
+        const getTypeColor = (type) => {
+            switch (type) {
+                case 'Reels': return 'bg-pink-100 text-pink-700';
+                case 'Carousel': return 'bg-purple-100 text-purple-700';
+                case 'Single Image': return 'bg-teal-100 text-teal-700';
+                default: return 'bg-slate-200 text-slate-800';
+            }
+        };
+        
+        const createCardElement = (idea) => {
+            const card = document.createElement('div');
+            card.id = idea.id;
+            card.className = 'kanban-card bg-white rounded-lg shadow-sm border border-slate-200';
+            card.draggable = true;
+            card.dataset.id = idea.id;
+
+            card.innerHTML = `
+                <div class="card-content-wrapper p-2">
+                    <div class="flex justify-between items-start mb-1">
+                        <p class="text-xs font-bold text-indigo-600 uppercase tracking-wider">${idea.product}</p>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${getTypeColor(idea.type)}">${idea.type}</span>
+                    </div>
+                    <p class="font-semibold text-slate-800">${idea.title}</p>
+                    <p class="description">${idea.description}</p>
+                </div>
+                <div class="copy-icon-container">
+                    <i class="fas fa-copy copy-icon text-slate-400 hover:text-indigo-600 transition-colors" title="Salin Teks"></i>
+                </div>
+            `;
+            card.addEventListener('dragstart', onDragStart);
+            card.addEventListener('dragend', onDragEnd);
+            return card;
+        };
+        
+        const populateIdeaBank = () => {
+            const scheduledIds = new Set();
+            for (const ideasOnDate of scheduledIdeas.values()) {
+                ideasOnDate.forEach(idea => scheduledIds.add(idea.id));
+            }
+
+            ideaBank.innerHTML = '';
+            const selectedProduct = productFilter.value;
+            contentIdeas.forEach(idea => {
+                if (!scheduledIds.has(idea.id)) {
+                    if (selectedProduct === 'all' || idea.product === selectedProduct) {
+                        ideaBank.appendChild(createCardElement(idea));
+                    }
+                }
+            });
+        };
+
+        const renderCalendar = () => {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const today = new Date();
+
+            monthYearEl.textContent = `${currentDate.toLocaleString('id-ID', { month: 'long' })} ${year}`;
+            calendarBody.innerHTML = '';
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                calendarBody.innerHTML += `<div class="border-b border-r border-slate-200 bg-slate-50"></div>`;
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const cell = document.createElement('div');
+                const dateStr = `${year}-${month + 1}-${day}`;
+                cell.className = 'calendar-day p-2 border-b border-r border-slate-200 relative flex flex-col gap-1';
+                cell.dataset.date = dateStr;
+
+                const dateNumber = document.createElement('span');
+                dateNumber.className = 'date-number mb-1';
+                dateNumber.textContent = day;
+                cell.appendChild(dateNumber);
+
+                if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                    cell.classList.add('today');
+                }
+                if (scheduledIdeas.has(dateStr)) {
+                    scheduledIdeas.get(dateStr).forEach(idea => {
+                        cell.appendChild(createCardElement(idea));
+                    });
+                }
+                
+                cell.addEventListener('dragover', onDragOver);
+                cell.addEventListener('dragleave', onDragLeave);
+                cell.addEventListener('drop', onDrop);
+                
+                calendarBody.appendChild(cell);
+            }
+        };
+        
+        const updateStateAndRender = () => {
+            renderCalendar();
+            populateIdeaBank();
+            saveStateToLocalStorage(); // Save state on every update
+        }
+
+        function onDragStart(e) {
+            draggedCard = e.target;
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        }
+
+        function onDragEnd(e) {
+            e.target.classList.remove('dragging');
+            draggedCard = null;
+        }
+
+        function onDragOver(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        }
+
+        function onDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function onDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            if (!draggedCard) return;
+
+            const cardId = draggedCard.dataset.id;
+            const idea = contentIdeas.find(i => i.id === cardId);
+            if (!idea) return;
+
+            for (const [date, ideas] of scheduledIdeas.entries()) {
+                const index = ideas.findIndex(i => i.id === cardId);
+                if (index !== -1) {
+                    ideas.splice(index, 1);
+                    if (ideas.length === 0) {
+                        scheduledIdeas.delete(date);
+                    }
+                    break;
+                }
+            }
+            
+            const dropTarget = e.currentTarget;
+            if (dropTarget.classList.contains('calendar-day')) {
+                const dateStr = dropTarget.dataset.date;
+                if (!scheduledIdeas.has(dateStr)) {
+                    scheduledIdeas.set(dateStr, []);
+                }
+                scheduledIdeas.get(dateStr).push(idea);
+            }
+            updateStateAndRender();
+        }
+        
+        const init = () => {
+            loadStateFromLocalStorage(); // Load state on startup
+            
+            const calendarHeader = document.getElementById('calendar-header');
+            const products = [...new Set(contentIdeas.map(idea => idea.product))];
+            products.sort().forEach(product => {
+                const option = document.createElement('option');
+                option.value = product;
+                option.textContent = product;
+                productFilter.appendChild(option);
+            });
+
+            const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+            days.forEach(day => {
+                calendarHeader.innerHTML += `<div class="p-2">${day}</div>`;
+            });
+            
+            updateStateAndRender();
+
+            productFilter.addEventListener('change', populateIdeaBank);
+            
+            prevMonthBtn.addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                renderCalendar();
+            });
+
+            nextMonthBtn.addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                renderCalendar();
+            });
+
+            ideaBank.addEventListener('dragover', onDragOver);
+            ideaBank.addEventListener('dragleave', onDragLeave);
+            ideaBank.addEventListener('drop', onDrop);
+
+            document.body.addEventListener('click', (e) => {
+                const copyIcon = e.target.closest('.copy-icon');
+                const card = e.target.closest('.kanban-card');
+
+                if (copyIcon && card.parentElement.classList.contains('calendar-day')) {
+                    e.stopPropagation();
+
+                    const cardId = card.dataset.id;
+                    const idea = contentIdeas.find(i => i.id === cardId);
+                    if (!idea) return;
+
+                    const productName = idea.product;
+                    const title = idea.title;
+                    const description = idea.description;
+                    const type = idea.type;
+                    const productHashtag = productName.replace(/\s/g, '');
+                    
+                    const textToCopy = `Produk: ${productName}\n\nJudul: ${title}\n\n${description}\n\n#NonaBersih #${productHashtag} #${type}`;
+                    
+                    const textArea = document.createElement("textarea");
+                    textArea.value = textToCopy;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        copyIcon.classList.remove('fa-copy', 'text-slate-400');
+                        copyIcon.classList.add('fa-check', 'text-green-500');
+                        setTimeout(() => {
+                            copyIcon.classList.add('fa-copy', 'text-slate-400');
+                            copyIcon.classList.remove('fa-check', 'text-green-500');
+                        }, 1500);
+                    } catch (err) {
+                        console.error('Gagal menyalin teks: ', err);
+                    }
+                    document.body.removeChild(textArea);
+                    return; 
+                }
+                
+                if (card && card.parentElement.classList.contains('calendar-day')) {
+                    const description = card.querySelector('.description');
+                    if (description) {
+                        description.classList.toggle('is-visible');
+                    }
+                }
+            });
+        };
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
